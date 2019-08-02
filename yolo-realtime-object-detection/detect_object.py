@@ -3,6 +3,9 @@ import cv2 as cv
 import sys
 import numpy as np
 import os.path
+import imutils
+from imutils.video import WebcamVideoStream
+from imutils.video import FPS
 
 net = cv.dnn.readNetFromDarknet("model/yolov3.cfg", "model/yolov3.weights")
 net.setPreferableBackend(cv.dnn.DNN_BACKEND_OPENCV)
@@ -14,14 +17,20 @@ classes = None
 with open(classesFile, 'rt') as f:
     classes = f.read().rstrip('\n').split('\n')
 
+# generate color for each class randomly
+COLORS = np.random.uniform(0, 255, size=(len(classes), 3))
+
 # threshold configuration
 confidenceThreshold = 0.5
 nmsThreshold = 0.4
 
 # draw bounding box
 def drawBoundingBox(classId, conf, left, top, right, bottom):
+
+    color = COLORS[classId]
+
     # Draw a bounding box.
-    cv.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 3)
+    cv.rectangle(frame, (left, top), (right, bottom), color, 3)
 
     label = '%.2f' % conf
 
@@ -32,7 +41,7 @@ def drawBoundingBox(classId, conf, left, top, right, bottom):
     labelSize, baseLine = cv.getTextSize(label, cv.FONT_HERSHEY_SIMPLEX, 0.5, 1)
     top = max(top, labelSize[1])
     cv.rectangle(frame, (left, top - round(1.5*labelSize[1])), (left + round(1.5*labelSize[0]), top + baseLine), (0, 0, 0), cv.FILLED)
-    cv.putText(frame, label, (left, top), cv.FONT_HERSHEY_SIMPLEX, 0.75, (0,255,0), 1)
+    cv.putText(frame, label, (left, top), cv.FONT_HERSHEY_SIMPLEX, 0.75, (255,255,255), 1)
 
 def processOutput(frame, outs):
     frameHeight = frame.shape[0]
@@ -76,8 +85,10 @@ windowName = 'Real-time object detection using Yolo'
 cv.namedWindow(windowName, cv.WINDOW_NORMAL)
 
 # video stream from camera
-vs = VideoStream(src=0).start()
 cv.resizeWindow(windowName, 800, 600)
+
+stream = WebcamVideoStream(src=0).start()
+fps = FPS().start()
 
 inputWidth = 416
 inputHeight = 416
@@ -85,7 +96,7 @@ inputHeight = 416
 while True:
 
     # grab the frame from video stream
-    frame = vs.read()
+    frame = stream.read()
 
     # create blob from frame.
     blob = cv.dnn.blobFromImage(frame, 1/255, (inputWidth, inputHeight), [0,0,0], 1, crop=False)
@@ -103,4 +114,7 @@ while True:
 
 	# if the `q` key was pressed, break from the loop
     if key == ord("q"):
+        fps.stop()
+        cv.destroyAllWindows()
+        stream.stop()
         break
